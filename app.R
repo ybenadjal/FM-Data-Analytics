@@ -1560,7 +1560,7 @@ Body <- dashboardBody(
           status = "primary",
           HTML(
             '<p>Github link:</p>
-            <p><a href="https://community.sigames.com/forums/topic/545140-a-tool-based-on-r-shiny-for-the-fm-data-driven-manager/"><em>Github</em></a></p>
+            <p><a href="https://github.com/ybenadjal/FM-Data-Analytics"><em>Github</em></a></p>
             <p><br></p>
             <p>For updates, guides, known issues or to report a bug:</p>
             <p><a href="https://community.sigames.com/forums/topic/545140-a-tool-based-on-r-shiny-for-the-fm-data-driven-manager/"><em>SI Forums thread</em></a></p>'
