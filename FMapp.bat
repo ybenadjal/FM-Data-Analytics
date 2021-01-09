@@ -1,0 +1,1 @@
+"C:\InstalledProg\R\R-4.0.3\bin\Rscript.exe" "C:\Users\ybena\Documents\fm_analytics\app.R"
