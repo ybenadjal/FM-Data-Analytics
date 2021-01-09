@@ -163,7 +163,7 @@ cleandata <- function(data) {
   format_money <- function(x) {
     x %>%
       # remove currency symbols and separators
-      str_remove_all("\u20AC|£|$") %>% str_remove_all(",") %>% # "\u20AC" = euro symbol
+      str_remove_all("\u20AC|\u00A3|\u0024") %>% str_remove_all(",") %>% # "\u20AC" = euro symbol
       # remove wage frequency symbols
       str_remove_all("p/w") %>% str_remove_all("p/a") %>% str_remove_all("p/m") %>%
       # replace decimal prefix units by their values
