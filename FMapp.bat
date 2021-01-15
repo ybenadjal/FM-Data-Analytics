@@ -9,7 +9,7 @@ echo.
 set "r_path1=C:\InstalledProg\R\R-4.0.3\bin"
 set "r_path2=\Rscript.exe"
 
-:: R application parial paths
+:: R application partial paths
 echo Setting application's path...
 echo.
 set "app_path1=%cd%"
