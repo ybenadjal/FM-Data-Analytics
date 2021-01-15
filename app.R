@@ -1,14 +1,42 @@
 # Setup -------------------------------------------------------------------
 
+# status message
+cat("\nCheck if packages need to be installed and install if needed...")
+Sys.sleep(2)
+
+# required packages
+requiredpack <- c(
+  "tidyverse",
+  "shiny",
+  "shinydashboard",
+  "shinyWidgets",
+  "plotly",
+  "reactable",
+  "XML",
+  "tictoc"
+)
+# already installed packages
+installedpack <- as.data.frame(installed.packages())$Package
+# extract missing packages i.e. required packages that are not installed
+missingpack <- requiredpack[!is.element(requiredpack, installedpack)]
+# install missing packages if there is more than 0 missing packages
+if (length(missingpack) > 0) install.packages(missingpack, repos = "https://cran.rstudio.com/")
+
+# status message
+cat("\n\nLoad required packages...\n")
+Sys.sleep(2)
+
 # load required packages
-library(shiny)
-library(shinydashboard)
-library(shinyWidgets)
-library(tidyverse)
-library(readxl)
-library(magrittr)
-library(plotly)
-library(reactable)
+library(shiny) # shiny package
+library(shinydashboard) # shinydashboard package
+library(shinyWidgets) # shinyWidgets package
+library(tictoc)
+library(readxl) # tidyverse package
+library(magrittr) # tidyverse package
+library(plotly) # plotly package
+library(reactable) # reactable package
+library(XML) # XML package
+library(tidyverse) # tidyverse package
 
 # working directory
 # function to get current file location
@@ -27,13 +55,24 @@ getCurrentFileLocation <-  function()
   }
   return(dirname(this_file))
 }
-wdir <- getCurrentFileLocation()
-# get wdir from Rstudio
-# wdir <- dirname(rstudioapi::getSourceEditorContext()$path)
-setwd(wdir)
-
+# get this script's directory
+sdir <- getCurrentFileLocation()
+# set working directory as script's directory
+setwd(sdir)
 
 # User defined functions --------------------------------------------------
+
+# reads and parse HTML outputs from FM
+# import all data as characters
+# uses UTF-8 encoding to allow for special characters such as currency symbols
+parse_FMoutput <- function(htmlpath) {
+  # read HTML table using UTF-8 encoding
+  data <- readHTMLTable(htmlpath, header = TRUE, encoding = "UTF-8") %>% .[[1]]
+  # make columns unique in case of duplicate names
+  colnames(data) %<>% make.unique(sep = "")
+  # return data
+  data
+}
 
 # position parsing
 # example1: "D/M(C)" to "D(C), M(C)"
@@ -138,7 +177,7 @@ cleandata <- function(data) {
                        "K Pas","K Ps/90","Pas A","Ps A/90","Pas %","Ps C",
                        "Ps C/90","Svh","Svp","Svt","Shots","ShT","ShT/90",
                        "Shot %","Shot/90","Itc","Int/90","K Tck","Tck A",
-                       "Tck R","Tck W","Tck2")
+                       "Tck R","Tck W","Tck1")
   
   statsgeneral <- c("AT Apps","AT Gls","AT Lge Apps","AT Lge Gls","Apps",
                     "Ast","Mins/Gl","Av Rat","Clean sheets","Con/90","FA",
@@ -163,7 +202,7 @@ cleandata <- function(data) {
   format_money <- function(x) {
     x %>%
       # remove currency symbols and separators
-      str_remove_all("\u20AC|\u00A3|\u0024") %>% str_remove_all(",") %>% # "\u20AC" = euro symbol
+      str_remove_all("\u20AC|\u00A3|\u0024") %>% str_remove_all(",") %>%
       # remove wage frequency symbols
       str_remove_all("p/w") %>% str_remove_all("p/a") %>% str_remove_all("p/m") %>%
       # replace decimal prefix units by their values
@@ -182,7 +221,7 @@ cleandata <- function(data) {
     replace(. == "-", NA) %>%
     # Name: Removes the nationality in 'shortlist', doesn't affect 'squad'
     mutate(`Name` = `Name`  %>% str_split("-") %>% sapply("[[", 1) %>% trimws()) %>%
-    # Special `Rec` condition: only applies to 'shortlist', warning for 'squad'
+    # Rec; scouting recommandation
     mutate_at(vars(one_of("Rec")), function(x) {
       str_remove_all(x, "-") %>% trimws() %>% as.numeric() %>% replace_na(-1)}) %>%
     # position: add the parsed position
@@ -216,8 +255,14 @@ cleandata <- function(data) {
     mutate_at(c(statschalkboard,statsgeneral),
               function(x) {x %>% str_remove_all(",") %>% as.numeric}) %>%
     # Format financial values as numeric
-    mutate_at(financials, format_money)
-  
+    mutate_at(financials, format_money) %>%
+    # Value and Wage: 0 if NA
+    mutate(`Value` = replace_na(`Value`, 0)) %>%
+    mutate(`Wage` = replace_na(`Wage`, 0)) %>%
+    # Club: free player/amateur if NA
+    mutate(`Club` = replace_na(`Club`, "Free player")) %>%
+    # Division: free player/unknown if NA
+    mutate(`Division` = replace_na(`Division`, "Free player/unknown"))
 }
 
 # assigns a level to the scout recommendation
@@ -259,7 +304,7 @@ plot_it <- function(data, x, y, xlabel, ylabel, targetratio) {
       "<b>Name: ", Name,
       "<br>Age: </b>", Age,
       "<br><b>Club: </b>", Club,
-      "<br><b>Nation: </b>", Nat2,
+      "<br><b>Nation: </b>", Nat1,
       "<br><b>Position: </b>", Position,
       "<br><b>Games played: </b>", Mins,
       "<br><b>", xlabel, ": </b>", round(x, digits = 1),
@@ -281,6 +326,9 @@ plot_it <- function(data, x, y, xlabel, ylabel, targetratio) {
       "4" = "green2",
       "5" = "green4"
     ),
+    # outline color
+    strokes = "black",
+    # hide legend for the markers
     showlegend = FALSE
   ) %>%
     # add name on top of the marker
@@ -323,7 +371,8 @@ sticky_style <- function(left = TRUE) {
   style
 }
 
-tabulate_it <- function(data) {
+tabulate_it <- function(data, dataset) {
+  dataset <- if_else(dataset == "squad", "DNA Rating", "Scouting Rec")
   reactable(
     data,
     defaultSortOrder = "desc",
@@ -332,7 +381,7 @@ tabulate_it <- function(data) {
       Rec = colDef(style = function(value) {
         color <- colorcatRec(value, FALSE)
         list(background = color)
-      }),
+      }, name = dataset),
       Value = colDef(format = colFormat(
         digits = 0, separators = TRUE, prefix = "\u20ac "
       )),
@@ -358,7 +407,7 @@ subsetdata <- function(data, reactindex, ...) {
       Age,
       Position,
       Mins,
-      Nat2,
+      Nat1,
       Club,
       ...
     ) %>%
@@ -367,40 +416,37 @@ subsetdata <- function(data, reactindex, ...) {
     )
 }
 
-# wrapper for numericInput
-numericInputDNA <- function(attribute, label) {
-  tags$div(class = "inline", numericInput(
-    inputId = paste0("sqmodel_", attribute), label = label,
-    value = 1.0, min = 0.0, max = 1.0, step = 0.1
-  ))
-}
-
-# User defined wrapper functions ------------------------------------------
-
-# wrp_pickerInput <- function(inputId, label, choices) {
-#   pickerInput(
-#     inputId = inputId, label = label,
-#     choices = choices, selected = choices, multiple = TRUE,
-#     options = list(
-#       `actions-box` = TRUE,
-#       `live-search` = TRUE,
-#       `size` = 7,
-#       `selected-text-format` = "count > 0"
-#     )
-#   )
-# }
-
 # Data Import -------------------------------------------------------------
 
-squad <- read_xlsx("data/fmextract.xlsm", sheet = "squad") %>% as.data.frame()
-shortlist <- read_xlsx("data/fmextract.xlsm", sheet = "shortlist") %>% as.data.frame()
+# import squad data and measure execution time
+cat("\nImporting squad data...")
+tic("\nImported squad data")
+squad <- parse_FMoutput("data/squad.html")
+toc()
+# import shortlist data and measure execution time
+cat("\nImporting shortlist data...")
+tic("\nImported shortlist data")
+shortlist <- parse_FMoutput("data/shortlist.html")
+toc()
 
 # Data cleaning & formatting ----------------------------------------------
 
+# clean & format squad data and measure execution time
+cat("\nCleaning & formatting squad data...")
+tic("\nCleaned & formatted squad data")
 squad %<>% mutate(Rec = NA, .after = Name) %>% cleandata()
+toc()
+# clean & format shortlist data and measure execution time
+cat("\nCleaning & formatting shortlist data...")
+tic("\nCleaned & formatted shortlist data")
 shortlist %<>% cleandata()
+toc()
 
 # App inputs --------------------------------------------------------------
+
+# status message
+cat("\nLoading app data...")
+tic("\nLoaded app data")
 
 # unique clubs appearing in the squad
 # i.e. the managed clubs + clubs with players on loan
@@ -414,8 +460,9 @@ sqclubs <- squad$Club %>%
   dplyr::arrange(desc(freq)) %>%
   # pull list of clubs as vector
   dplyr::pull(1)
-# unique divisions appearing in the shortlist
-divisions <- shortlist$Division %>% unique() %>% sort()
+# unique divisions appearing in the shortlist (put free player at the end)
+divisions <- shortlist$Division %>% unique() %>% sort() %>%
+  .[. != "Free player/unknown"] %>% c("Free player/unknown")
 # unique FM positions
 positions <- c("GK", # goalkeepers
                "D(L)", "D(C)", "D(R)", # defenders
@@ -441,7 +488,7 @@ Sidebar <- dashboardSidebar(
       "Squad Analysis", tabName = "squad", icon = icon("users"),
       startExpanded = TRUE,
       menuSubItem(
-        HTML("DNA Model (<i>in progress</i>)"), tabName = "sqmodel", icon = icon("sliders-h")
+        HTML("DNA Model"), tabName = "sqmodel", icon = icon("sliders-h")
       ),
       menuSubItem(
         "Filters", tabName = "sqfilter", icon = icon("filter"),
@@ -506,53 +553,129 @@ Sidebar <- dashboardSidebar(
 
 Body <- dashboardBody(
   tabItems(
-    # #### Squad: DNA Model ####
-    # tabItem(
-    #   tabName = "sqmodel",
-    #   tabBox(
-    #     title = "Attributes Weighting",
-    #     width = 12, height = '85vh',
-    #     tabPanel(
-    #       title = "Weighting",
-    #       column(
-    #         width = 3,
-    #         "Technical", br(),
-    #         numericInputDNA("Cor", "Corners"),
-    #         numericInputDNA("Cro", "Crossing"),
-    #         numericInputDNA("Dri", "Dribbling"),
-    #         numericInputDNA("Fin", "Finishing"),
-    #         numericInputDNA("Fir", "First Touch"),
-    #         numericInputDNA("Fre", "Free Kicks"),
-    #         numericInputDNA("Hea", "Heading"),
-    #         numericInputDNA("Lon", "Long Shots"),
-    #         numericInputDNA("L_Th", "Long Throws"),
-    #         numericInputDNA("Mar", "Marking"),
-    #         numericInputDNA("Pas", "Passing"),
-    #         numericInputDNA("Pen", "Penalty Taking"),
-    #         numericInputDNA("Tck", "Tackling"),
-    #         numericInputDNA("Tec", "Technique")
-    #       ),
-    #       column(
-    #         width = 3,
-    #         "Mental",
-    #         numericInputDNA("Agg", "Aggression"),
-    #         numericInputDNA("Ant", "Anticipation"),
-    #         numericInputDNA("Bra", "Bravery"),
-    #         numericInputDNA("Cmp", "Composure"),
-    #         numericInputDNA("Cnt", "Concentration"),
-    #         numericInputDNA("Dec", "Decisions"),
-    #         numericInputDNA("Det", "Determination"),
-    #         numericInputDNA("Fla", "Flair"),
-    #         numericInputDNA("Ldr", "Leadership"),
-    #         numericInputDNA("OtB", "Off The Ball"),
-    #         numericInputDNA("Pos", "Positioning"),
-    #         numericInputDNA("Tea", "Teamwork"),
-    #         numericInputDNA("Vis", "Vision"),
-    #         numericInputDNA("Wor", "Work Rate")
-    #       )
-    #     )
-    #   )
-    # ),
+    #### Squad: DNA Model ####
+    tabItem(
+      tabName = "sqmodel",
+      box(
+        title = "Attributes Selection",
+        width = 12, height = "85vh",
+        background = "purple",
+        HTML(
+          "
+            <p>Constitute your DNA model by selecting key attributes for your playing style. The selected attributes will be used to calculate your players DNA rating according to the model.</p>
+            "
+        ),
+        splitLayout(
+          cellWidths = c("25%", "25%", "25%", "25%"),
+          # technical attributes
+          checkboxGroupInput(
+            inputId = "sqmodel_technical",
+            label = "Technical",
+            choices = c(
+              "Corners" = "Cor",
+              "Crossing" = "Cro",
+              "Dribbling" = "Dri",
+              "Finishing" = "Fin",
+              "First Touch" = "Fir",
+              "Free Kicks" = "Fre",
+              "Heading" = "Hea",
+              "Long Shots" = "Lon",
+              "Long Throws" = "L Th",
+              "Marking" = "Mar",
+              "Passing" = "Pas",
+              "Penalty Taking" = "Pen",
+              "Tackling" = "Tck",
+              "Technique" = "Tec"
+            ),
+            selected = NULL
+          ),
+          # mental attributes
+          checkboxGroupInput(
+            inputId = "sqmodel_mental",
+            label = "Mental",
+            choices = c(
+              "Aggression" = "Agg",
+              "Anticipation" = "Ant",
+              "Bravery" = "Bra",
+              "Composure" = "Cmp",
+              "Concentration" = "Cnt",
+              "Decisions" = "Dec",
+              "Determination" = "Det",
+              "Flair" = "Fla",
+              "Leadership" = "Ldr",
+              "Off The Ball" = "OtB",
+              "Positioning" = "Pos",
+              "Teamwork" = "Tea",
+              "Vision" = "Vis",
+              "Work Rate" = "Wor"
+            ),
+            selected = NULL
+          ),
+          # physical attributes
+          checkboxGroupInput(
+            inputId = "sqmodel_physical",
+            label = "Physical",
+            choices = c(
+              "Acceleration" = "Acc",
+              "Agility" = "Agi",
+              "Balance" = "Bal",
+              "Jumping Reach" = "Jum",
+              "Natural Fitnes" = "Nat",
+              "Pace" = "Pac",
+              "Stamina" = "Sta",
+              "Strength" = "Str"
+            ),
+            selected = NULL
+          ),
+          # goalkeeping attributes
+          checkboxGroupInput(
+            inputId = "sqmodel_gk",
+            label = "Goalkeeping",
+            choices = c(
+              "Aerial Reach" = "Aer",
+              "Command Of Area" = "Cmd",
+              "Communication" = "Com",
+              "Eccentricity" = "Ecc",
+              "Handling" = "Han",
+              "Kicking" = "Kic",
+              "One On Ones" = "1v1",
+              "Punching (Tendency)" = "Pun",
+              "Reflexes" = "Ref",
+              "Rushing Out (Tendency)" = "TRO",
+              "Throwing" = "Thr"
+            ),
+            selected = NULL
+          )
+        ),
+        # deselect buttons for each of the 4 attributes categories
+        splitLayout(
+          cellWidths = c("25%", "25%", "25%", "25%"),
+          actionButton(
+            inputId = "sqmodel_deselect_tec", label = " Deselect all technical",
+            width = '100%', style = 'margin-bottom:0.5px'
+          ),
+          actionButton(
+            inputId = "sqmodel_deselect_men", label = " Deselect all mental",
+            width = '100%', style = 'margin-bottom:0.5px'
+          ),
+          actionButton(
+            inputId = "sqmodel_deselect_phy", label = " Deselect all physical",
+            width = '100%', style = 'margin-bottom:0.5px'
+          ),
+          actionButton(
+            inputId = "sqmodel_deselect_gk", label = " Deselect all goalkeeping",
+            width = '100%', style = 'margin-bottom:0.5px'
+          )
+        ),
+        # Remarks about the DNA rating
+        HTML(
+          "
+          <br><p><em>* The rating is calculated as follows: Average(key attributes)/20 rounded to the nearest integer. For instance 15(or 12 or 8) on all key attributes yield a DNA rating of 75(or 60 or 40).</em></p>
+          <p><em>** Outfield players rating do not use Goalkeeping attributes. Goalkeepers ratings use the Goalkeeping attributes instead of the Technical attributes. No attributes selected yield a DNA rating of -1 (same as scouting recommandation for non-scouted players).</em></p>
+          "
+        )
+      )
+    ),
     
     #### Squad: Filters submenu ####
     tabItem(
@@ -1547,11 +1670,17 @@ Body <- dashboardBody(
           width = 6, height = '85vh',
           status = "primary",
           HTML(
-            "<p>Designed to mirror professional football club's performance analysis tools, this app enables FM managers to use in-game statistics at their full potential. Whether it be to decide which players you&apos;ll target from the hundreds on your shortlist, or to identify sub-performing or over-performing players within your own squad, you will have the possibility to use the app&apos;s interactive visualizations to support your decisions.</p>
+            "
+            <p>Designed to mirror professional football club's performance analysis tools, this app enables FM managers to use in-game statistics at their full potential. Whether it be to decide which players you&apos;ll target from the hundreds on your shortlist, or to identify sub-performing or over-performing players within your own squad, you will have the possibility to use the app&apos;s interactive visualizations to support your decisions.</p>
             <p>However, don&apos;t forget &mdash; statistics only tell one part of the story!</p>
             <p><br></p>
-            <p><strong>Developed by:</strong> gam945 (<em>SI Forums</em>)/ybenadjal (<em>Github</em>)</p>
-            <p><strong>Contributors:</strong> PM me on the forums to contribute ;)</p>"
+            <p><strong>Developed by:</strong>
+            <br>gam945 (<em>SI forums</em>)/ybenadjal (<em>GitHub</em>)</p>
+            <p><strong>Contributors:</strong>
+            <br>biglew90(<em>SI Forums</em>)/LBrookes90 (<em>GitHub</em>)</p>
+            <p><br></p>
+            <p>PM me on the SI forums to contribute ;)</p>
+            "
           )
         ),
         box(
@@ -1559,11 +1688,13 @@ Body <- dashboardBody(
           width = 6, height = '85vh',
           status = "primary",
           HTML(
-            '<p>Github link:</p>
+            '
+            <p>Github link:</p>
             <p><a href="https://github.com/ybenadjal/FM-Data-Analytics"><em>Github</em></a></p>
             <p><br></p>
             <p>For updates, guides, known issues or to report a bug:</p>
-            <p><a href="https://community.sigames.com/forums/topic/545140-a-tool-based-on-r-shiny-for-the-fm-data-driven-manager/"><em>SI Forums thread</em></a></p>'
+            <p><a href="https://community.sigames.com/forums/topic/545140-a-tool-based-on-r-shiny-for-the-fm-data-driven-manager/"><em>SI Forums thread</em></a></p>
+            '
           )
         )
       )
@@ -1580,11 +1711,78 @@ ui <- dashboardPage(Header, Sidebar, Body, skin = "purple")
 
 server <- function(input, output, session) {
   
+  #### Squad: DNA Model ####
+  
+  # deselect all attributes from a category when the "Deselect all <category>" button is clicked on
+  observeEvent(
+    input$sqmodel_deselect_tec, {
+      updateCheckboxGroupInput(
+        session = session, inputId = "sqmodel_technical", selected = character(0)
+      )
+    }
+  )
+  observeEvent(
+    input$sqmodel_deselect_men, {
+      updateCheckboxGroupInput(
+        session = session, inputId = "sqmodel_mental", selected = character(0)
+      )
+    }
+  )
+  observeEvent(
+    input$sqmodel_deselect_phy, {
+      updateCheckboxGroupInput(
+        session = session, inputId = "sqmodel_physical", selected = character(0)
+      )
+    }
+  )
+  observeEvent(
+    input$sqmodel_deselect_gk, {
+      updateCheckboxGroupInput(
+        session = session, inputId = "sqmodel_gk", selected = character(0)
+      )
+    }
+  )
+  
+  # calculate ratings
+  squad_DNArated <- reactive({
+    if (length(c(input$sqmodel_technical, input$sqmodel_mental, input$sqmodel_physical, input$sqmodel_gk)) == 0) {
+      squad %>% mutate(`Rec` = -1)
+    } else {
+      # key outfield attributes
+      outf_keyattr <- c(input$sqmodel_technical, input$sqmodel_mental, input$sqmodel_physical)
+      outf_n <- length(outf_keyattr)
+      # key gk attributes
+      gk_keyattr <- c(input$sqmodel_mental, input$sqmodel_physical, input$sqmodel_gk)
+      gk_n <- length(gk_keyattr)
+      # subset data: outfield players
+      outf_players <- squad %>%
+        dplyr::select(Name, Position, all_of(outf_keyattr)) %>%
+        dplyr::filter(Position != "GK")
+      # subset data: goalkeepers
+      gk_players <- squad %>%
+        dplyr::select(Name, Position, all_of(gk_keyattr)) %>%
+        dplyr::filter(Position == "GK")
+      # get ratings for outfield players
+      outf_players %<>% cbind(Rec = dplyr::select(outf_players, -c(Name, Position)) %>% rowSums()) %>%
+        dplyr::select(Name, Position,Rec) %>%
+        mutate(Rec = round(Rec*100/20/outf_n, digits = 0))
+      # get ratings for outfield players
+      gk_players %<>% cbind(Rec = dplyr::select(gk_players, -c(Name, Position)) %>% rowSums()) %>%
+        dplyr::select(Name, Position,Rec) %>%
+        mutate(Rec = round(Rec*100/20/gk_n, digits = 0))
+      # ratings
+      ratings <- rbind(outf_players, gk_players)
+      # inner join by name and position
+      squad %>% dplyr::select(-Rec) %>%
+        inner_join(y = ratings, by = c("Name" = "Name", "Position" = "Position"))
+    }
+  })
+  
   #### Squad: Filters ####
   
   # filtered subset data for reactable presentation
   squad_filtsubset <- reactive({
-    squad %>%
+    squad_DNArated() %>% as.data.frame() %>%
       select(Name, Rec, Position, PositionParsed, Division, Club, Age, Value, Wage, Mins) %>%
       # filter using the filters inputs
       dplyr::filter(Club %in% input$squad_club) %>%
@@ -1604,7 +1802,7 @@ server <- function(input, output, session) {
   
   # filtered subset reactable
   output$squad_filtered <- renderReactable({
-    tabulate_it(data = squad_filtsubset())
+    tabulate_it(data = squad_filtsubset(), dataset = "squad")
   })
   
   # filtered subset names: used as an index
@@ -1615,7 +1813,8 @@ server <- function(input, output, session) {
   # filtered subset reactable for plots
   squad_data <- reactive({
     subsetdata(
-      data = squad, reactindex = as.vector(as.data.frame(squad_index())$Name),
+      data = squad_DNArated() %>% as.data.frame(),
+      reactindex = as.vector(as.data.frame(squad_index())$Name),
       `Av Rat`, `Pts/Gm`, `Clean sheets`, # general
       `Ps A/90`, `Ps C/90`, `K Ps/90`, `Ch C/90`, `Asts/90`, `Cr A`, `Cr C`, # passing
       `Shot/90`, `ShT/90`, `Gls/90`, `Tgls/90`, `xG`, # shooting
@@ -2053,7 +2252,7 @@ server <- function(input, output, session) {
   
   # filtered subset reactable
   output$scout_filtered <- renderReactable({
-    tabulate_it(data = scout_filtsubset())
+    tabulate_it(data = scout_filtsubset(), dataset = "scouting")
   })
   
   # filtered subset names: used as an index
@@ -2499,11 +2698,22 @@ server <- function(input, output, session) {
       ) %>%
       dplyr::filter(Name %in% listfinal)
     # reactable
-    tabulate_it(data = listfinal_data)
+    tabulate_it(data = listfinal_data, dataset = "scouting")
   })
   
 }
 
+# App data loaded...check line 458
+toc()
+
 # Run app -----------------------------------------------------------------
 
+# status message
+cat("\nApp will launch in 3...")
+Sys.sleep(1)
+cat("2...")
+Sys.sleep(1)
+cat("1...\n")
+Sys.sleep(1)
+# run without warnings
 shinyApp(ui = ui, server = server, options = list(launch.browser = TRUE))
