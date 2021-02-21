@@ -11,9 +11,9 @@ requiredpack <- c(
   "shinydashboard",
   "shinyWidgets",
   "plotly",
-  "reactable",
   "XML",
-  "tictoc"
+  "tictoc",
+  "DT"
 )
 # already installed packages
 installedpack <- as.data.frame(installed.packages())$Package
@@ -31,10 +31,9 @@ library(shiny) # shiny package
 library(shinydashboard) # shinydashboard package
 library(shinyWidgets) # shinyWidgets package
 library(tictoc)
-library(readxl) # tidyverse package
 library(magrittr) # tidyverse package
 library(plotly) # plotly package
-library(reactable) # reactable package
+library(DT) # DT package
 library(XML) # XML package
 library(tidyverse) # tidyverse package
 
@@ -59,6 +58,68 @@ getCurrentFileLocation <-  function()
 sdir <- getCurrentFileLocation()
 # set working directory as script's directory
 setwd(sdir)
+
+
+# App inputs 1 ------------------------------------------------------------
+# independant of the data
+
+# unique FM positions
+positions <- c("GK", # goalkeepers
+               "D(L)", "D(C)", "D(R)", # defenders
+               "WB(L)", "WB(R)", # wingbacks
+               "DM", # defensive midfielders
+               "M(L)", "M(C)", "M(R)", # midfielders
+               "AM(L)", "AM(C)", "AM(R)", # attacking midfielders
+               "ST(C)" # strikers
+)
+
+# FM data points: attributes
+fm_attributes <- c("Aer","Cmd","Com","Ecc","Han","Kic","1v1","Pun","Ref","TRO",
+                "Thr","Agg","Ant","Bra","Cmp","Cnt","Dec","Det","Fla","Ldr",
+                "OtB","Pos","Tea","Vis","Wor","Acc","Agi","Bal","Jum","Nat",
+                "Pac","Sta","Str","Cor","Cro","Dri","Fin","Fir","Fre","Hea",
+                "Lon","L Th","Mar","Pas","Pen","Tck","Tec")
+
+# FM data points: statistics (chalkboard)
+fm_statschalkboard <- c("Hdrs A","Aer A/90","Hdrs","Hdrs W/90","Hdr %",
+                     "K Hdrs","Cr A","Cr C/A","Cr C","Gl Mst","Distance",
+                     "Dist/90","Drb","DrbPG","Off","Asts/90","CCC","Ch C/90",
+                     "K Pas","K Ps/90","Pas A","Ps A/90","Pas %","Ps C",
+                     "Ps C/90","Svh","Svp","Svt","Shots","ShT","ShT/90",
+                     "Shot %","Shot/90","Itc","Int/90","K Tck","Tck A",
+                     "Tck R","Tck W","Tck1")
+
+# FM data points: statistics (general)
+fm_statsgeneral <- c("AT Apps","AT Gls","AT Lge Apps","AT Lge Gls","Apps",
+                  "Ast","Mins/Gl","Av Rat","Clean sheets","Con/90","FA",
+                  "Fls","Gwin","D","Lost","G. Mis","Won","Gls","Conc",
+                  "Gls/90","Last 5 FT Games","Last 5 Games","Mins",
+                  "Mins/Gm","Last C","Last Gl","Pens","Pens Faced",
+                  "Pens Saved","Pens Saved Ratio","Pens S","Pen/R","PoM",
+                  "Pts/Gm","Red","Starts","Tcon/90","Tgls","Tcon","Tgls/90",
+                  "xG", "Yel","Int Apps","Int Ast","Int Av Rat","Int Conc")
+
+# FM data points: custom category - financials
+fm_financials <- c("Appearance Fee","Assist Bonus","Cln Sheet Bonus","Goal Bonus",
+                "Int Cap Bonus","SLAB","SLGAB","SLGB","Team Year Bonus",
+                "Top Score Bonus","Unused Sub Fee","WaCLG","Injury Rls",
+                "Min Fee Rls","Min Fee Rls Clubs In Cont Comp",
+                "Min Fee Rls Clubs Mjr Cont Comp","Min Fee Rls to Higher Div",
+                "Min Fee Rls to Domestic Clubs","Min Fee Rls to Foreign Clubs",
+                "Non Prom Rls Cls","Non-Playing Rel","Relegation Release",
+                "Wage","Wage After Tax","Wage Contrib.","New Wage","Max AP",
+                "Max WD","Min AP","Min WD","Asking Price","Fee",
+                "Last Trans. Fee","Ovr","Transfer Fees Received","Value")
+
+# FM data points: custom category - stats for progress tables
+fm_stats <- c("Aer A/90", "Hdrs W/90", "Hdr %", "K Hdrs", "Gl Mst", "Dist/90",
+            "DrbPG", "Off", "Cr A", "Cr C", "Cr C/A", "Ps A/90", "Ps C/90",
+            "Pas %", "K Ps/90", "Ch C/90", "Asts/90", "Shot/90", "ShT/90",
+            "Shot %", "Gls/90", "Int/90", "K Tck", "Tck A", "Tck W", "Tck R",
+            "Svh", "Svp", "Svt", "Con/90", "Apps", "Starts", "Mins", "Av Rat",
+            "Clean sheets", "Gwin", "PoM", "Pts/Gm", "Tcon/90", "Tgls/90",
+            "Pens Faced", "Pens Saved", "Pens Saved Ratio", "Pens", "Pens S",
+            "Pen/R", "FA", "Fls", "Yel", "Red")
 
 # User defined functions --------------------------------------------------
 
@@ -165,40 +226,6 @@ formatPct <- function(x) {
 # cleans the raw data extracted from FM
 cleandata <- function(data) {
   
-  attributes <- c("Aer","Cmd","Com","Ecc","Han","Kic","1v1","Pun","Ref","TRO",
-                  "Thr","Agg","Ant","Bra","Cmp","Cnt","Dec","Det","Fla","Ldr",
-                  "OtB","Pos","Tea","Vis","Wor","Acc","Agi","Bal","Jum","Nat",
-                  "Pac","Sta","Str","Cor","Cro","Dri","Fin","Fir","Fre","Hea",
-                  "Lon","L Th","Mar","Pas","Pen","Tck","Tec")
-  
-  statschalkboard <- c("Hdrs A","Aer A/90","Hdrs","Hdrs W/90","Hdr %",
-                       "K Hdrs","Cr A","Cr C/A","Cr C","Gl Mst","Distance",
-                       "Dist/90","Drb","DrbPG","Off","Asts/90","CCC","Ch C/90",
-                       "K Pas","K Ps/90","Pas A","Ps A/90","Pas %","Ps C",
-                       "Ps C/90","Svh","Svp","Svt","Shots","ShT","ShT/90",
-                       "Shot %","Shot/90","Itc","Int/90","K Tck","Tck A",
-                       "Tck R","Tck W","Tck1")
-  
-  statsgeneral <- c("AT Apps","AT Gls","AT Lge Apps","AT Lge Gls","Apps",
-                    "Ast","Mins/Gl","Av Rat","Clean sheets","Con/90","FA",
-                    "Fls","Gwin","D","Lost","G. Mis","Won","Gls","Conc",
-                    "Gls/90","Last 5 FT Games","Last 5 Games","Mins",
-                    "Mins/Gm","Last C","Last Gl","Pens","Pens Faced",
-                    "Pens Saved","Pens Saved Ratio","Pens S","Pen/R","PoM",
-                    "Pts/Gm","Red","Starts","Tcon/90","Tgls","Tcon","Tgls/90",
-                    "xG", "Yel","Int Apps","Int Ast","Int Av Rat","Int Conc")
-  
-  financials <- c("Appearance Fee","Assist Bonus","Cln Sheet Bonus","Goal Bonus",
-                  "Int Cap Bonus","SLAB","SLGAB","SLGB","Team Year Bonus",
-                  "Top Score Bonus","Unused Sub Fee","WaCLG","Injury Rls",
-                  "Min Fee Rls","Min Fee Rls Clubs In Cont Comp",
-                  "Min Fee Rls Clubs Mjr Cont Comp","Min Fee Rls to Higher Div",
-                  "Min Fee Rls to Domestic Clubs","Min Fee Rls to Foreign Clubs",
-                  "Non Prom Rls Cls","Non-Playing Rel","Relegation Release",
-                  "Wage","Wage After Tax","Wage Contrib.","New Wage","Max AP",
-                  "Max WD","Min AP","Min WD","Asking Price","Fee",
-                  "Last Trans. Fee","Ovr","Transfer Fees Received","Value")
-  
   format_money <- function(x) {
     x %>%
       # remove currency symbols and separators
@@ -230,7 +257,7 @@ cleandata <- function(data) {
       .after = `Position`
     ) %>%
     # Attributes: mean of upper and lower bound if no exact values known
-    mutate_at(attributes, function(x) {
+    mutate_at(fm_attributes, function(x) {
       str_split(x, "-") %>% lapply(as.numeric) %>% lapply(mean) %>% unlist()}) %>%
     # Remove the league from the based nation; league is available in separate datapoint
     mutate(`Based` = str_split(`Based`, "\\(") %>% sapply("[[", 1) %>% trimws()) %>%
@@ -252,10 +279,10 @@ cleandata <- function(data) {
     mutate(`Int Apps` = str_remove_all(`Int Apps`,"[//(//)]") %>% str_split(" ") %>%
              lapply(as.numeric) %>% lapply(sum) %>% unlist()) %>% # total int appearances
     # Stats as numeric values
-    mutate_at(c(statschalkboard,statsgeneral),
+    mutate_at(c(fm_statschalkboard,fm_statsgeneral),
               function(x) {x %>% str_remove_all(",") %>% as.numeric}) %>%
     # Format financial values as numeric
-    mutate_at(financials, format_money) %>%
+    mutate_at(fm_financials, format_money) %>%
     # Value and Wage: 0 if NA
     mutate(`Value` = replace_na(`Value`, 0)) %>%
     mutate(`Wage` = replace_na(`Wage`, 0)) %>%
@@ -267,7 +294,7 @@ cleandata <- function(data) {
 
 # assigns a level to the scout recommendation
 # used to determine the marker color in the visualizations
-# and the less saturated color in the reactables, depending on the variable 'plot'
+# and the less saturated color in the tables, depending on the variable 'plot'
 colorcatRec <- function(rec, plot = TRUE) {
   case_when(
     rec == -1 ~ if_else(plot == TRUE, "-1", "#bf3eff"), # darkorchid1
@@ -360,39 +387,380 @@ grepl_op <- function(pattern_array, x) {
   as.logical(check)
 }
 
-# style item to freeze a left row in a reactable table
-sticky_style <- function(left = TRUE) {
-  style <- list(position = "sticky", background = "#fff", zIndex = 1)
-  if (left) {
-    style <- c(style, list(left = 0, borderRight = "1px solid #eee"))
+# DT tables for the progress submenus
+# tabulates attributes/performance data difference
+tabulate_progress <- function(dataList, prevdate, currdate, type) {
+  
+  # transform prevdate and currdate from the inputs format into the original format
+  prevdate %<>% as.Date("%d %b %Y") %>% format("%Y%m%d")
+  currdate %<>% as.Date("%d %b %Y") %>% format("%Y%m%d")
+  
+  # determine if working with attributes or performance stats
+  if (type == "attr") {
+    datapoints <- fm_attributes
   } else {
-    style <- c(style, list(right = 0, borderLeft = "1px solid #eee"))
+    datapoints <- fm_stats
   }
-  style
+  
+  # previous date data
+  previous <- dataList[[prevdate]]() %>% as.data.frame() %>%
+    # select required columns: base 
+    select(Name, Age, Position, Rec, all_of(datapoints))
+  
+  # current date data
+  current <- dataList[[currdate]]() %>% as.data.frame() %>%
+    select(Name, Age, Position, Rec, all_of(datapoints))
+  
+  # difference dataframe
+  # name column: union of all names in the prev & curr data sets
+  difference <- data.frame(Name = base::union(previous$Name, current$Name))
+  # add a comment column: check if player is new or out
+  # stack() to transform named vector to dataframe
+  comment <- stack(sapply(difference$Name, function(x) {
+    case_when(
+      # if name in prev but not in curr: player is out
+      (x %in% previous$Name) & !(x %in% current$Name) ~ "Player no longer at club",
+      # if name not in prev but in curr: player is new
+      !(x %in% previous$Name) & (x %in% current$Name) ~ "New player",
+      # if name in prev and curr: player has stayed; no comment
+      (x %in% previous$Name) & (x %in% current$Name) ~ ""
+    )
+  })) %>%
+    # rename values column to facilitate the inner_join later
+    mutate(Comment = values, .keep = "unused")
+  
+  # add corresponding comment to the player
+  difference %<>% inner_join(comment, by = c("Name" = "ind"))
+  
+  # difference: prev version contains all names from difference
+  difference_prev <- difference %>% left_join(previous, by = c("Name" = "Name"))
+  # difference: curr version contains all names from difference
+  difference_curr <- difference %>% left_join(current, by = c("Name" = "Name"))
+  
+  # set difference as current version
+  difference <- difference_curr
+  # compute per 90 statistics for appropriate data if tabulating performance progress
+  if (type != "attr") {
+    for (i in list(difference_curr, difference_prev)) {
+      i %<>%
+        mutate(`K Hdrs/90` = `K Hdrs`/Mins, .after = `K Hdrs`) %>%
+        mutate(`Gl Mst/90` = `Gl Mst`/Mins, .after = `Gl Mst`) %>%
+        mutate(`Off/90` = `Off`/Mins, .after = `Off`) %>%
+        mutate(`Cr A/90` = `Cr A`/Mins, .after = `Cr A`) %>%
+        mutate(`Cr C/90` = `Cr C`/Mins, .after = `Cr C`) %>%
+        mutate(`K Tck/90` = `K Tck`/Mins, .after = `K Tck`) %>%
+        mutate(`Tck A/90` = `Tck A`/Mins, .after = `Tck A`) %>%
+        mutate(`Tck W/90` = `Tck W`/Mins, .after = `Tck W`) %>%
+        mutate(`Svh/90` = `Svh`/Mins, .after = `Svh`) %>%
+        mutate(`Svp/90` = `Svp`/Mins, .after = `Svp`) %>%
+        mutate(`Svt/90` = `Svt`/Mins, .after = `Svt`) %>%
+        mutate(`FA/90` = `FA`/Mins, .after = `FA`) %>%
+        mutate(`Fls/90` = `Fls`/Mins, .after = `Fls`) %>%
+        mutate(`Yel/90` = `Yel`/Mins, .after = `Yel`) %>%
+        mutate(`Red/90` = `Red`/Mins, .after = `Red`) %>%
+        select(-c(
+          `K Hdrs`, `Gl Mst`, `Off`, `Cr A`, `Cr C`, `K Tck`, `Tck A`,
+          `Tck W`, `Svh`, `Svp`, `Svt`, `FA`, `Fls`, `Yel`, `Red`
+        ))
+    }
+  }
+  
+  # compute difference between curr and prev
+  for (i in c("Rec", datapoints)) {
+    difference[i] <- difference_curr[[i]] - difference_prev[[i]]
+  }
+  
+  # add overall column if tabulating the attributes progress
+  if (type == "attr") {
+    difference %<>% mutate(Overall = rowSums(select(., all_of(datapoints))), .after = "Rec")
+    # round values to 2 digits
+    for (i in c("Rec", datapoints)) {
+      difference[i] <- round(difference[[i]], digits = 2)
+    }
+  }
+  
+  # initialise DT column options
+  DTcols_options <- list()
+  # options depending on dataset type: attr or stats
+  if (type == "attr") {
+    # grouped columns
+    DTcols_options$cols <- htmltools::withTags(table(
+      class = "display",
+      thead(
+        tr(
+          # group columns and hover info
+          th(rowspan = 2, "Name", title = "Player Name"),
+          th(rowspan = 2, "Comment", title = "Comment"),
+          th(rowspan = 2, "Age", title = "Age"),
+          th(rowspan = 2, "Position", title = "Position"),
+          th(rowspan = 2, "DNA Rating", title = "DNA Rating"),
+          th(rowspan = 2, "Overall", title = "Total variation of attributes"),
+          th(colspan = 11, "Goalkeeping", aligne = "center"),
+          th(colspan = 14, "Mental", aligne = "center"),
+          th(colspan = 8, "Physical", aligne = "center"),
+          th(colspan = 14, "Technical", aligne = "center")
+        ),
+        tr(
+          # individual columns and hover info
+          th("Aer", title = "Aerial Reach"),
+          th("Cmd", title = "Command Of Area"),
+          th("Com", title = "Communication"),
+          th("Ecc", title = "Eccentricity"),
+          th("Han", title = "Handling"),
+          th("Kic", title = "Kicking"),
+          th("1v1", title = "One On Ones"),
+          th("Pun", title = "Punching (Tendency)"),
+          th("Ref", title = "Reflexes"),
+          th("TRO", title = "Rushing Out (Tendency)"),
+          th("Thr", title = "Throwing"),
+          th("Agg", title = "Aggression"),
+          th("Ant", title = "Anticipation"),
+          th("Bra", title = "Bravery"),
+          th("Cmp", title = "Composure"),
+          th("Cnt", title = "Concentration"),
+          th("Dec", title = "Decisions"),
+          th("Det", title = "Determination"),
+          th("Fla", title = "Flair"),
+          th("Ldr", title = "Leadership"),
+          th("OtB", title = "Off The Ball"),
+          th("Pos", title = "Positioning"),
+          th("Tea", title = "Teamwork"),
+          th("Vis", title = "Vision"),
+          th("Wor", title = "Work Rate"),
+          th("Acc", title = "Acceleration"),
+          th("Agi", title = "Agility"),
+          th("Bal", title = "Balance"),
+          th("Jum", title = "Jumping Reach"),
+          th("Nat", title = "Natural Fitnes"),
+          th("Pac", title = "Pace"),
+          th("Sta", title = "Stamina"),
+          th("Str", title = "Strength"),
+          th("Cor", title = "Corners"),
+          th("Cro", title = "Crossing"),
+          th("Dri", title = "Dribbling"),
+          th("Fin", title = "Finishing"),
+          th("Fir", title = "First Touch"),
+          th("Fre", title = "Free Kicks"),
+          th("Hea", title = "Heading"),
+          th("Lon", title = "Long Shots"),
+          th("L Th", title = "Long Throws"),
+          th("Mar", title = "Marking"),
+          th("Pas", title = "Passing"),
+          th("Pen", title = "Penalty Taking"),
+          th("Tck", title = "Tackling"),
+          th("Tec", title = "Technique")
+        )
+      )
+    ))
+    # background color for grouped columns names
+    DTcols_options$group_JSrender <- "
+    function(thead) {
+    $(thead).closest('thead').find('th').eq(6).css('background-color', '#D9E1F2');
+    $(thead).closest('thead').find('th').eq(7).css('background-color', '#8EA9DB');
+    $(thead).closest('thead').find('th').eq(8).css('background-color', '#D9E1F2');
+    $(thead).closest('thead').find('th').eq(9).css('background-color', '#8EA9DB')
+    }
+    "
+    # sort order
+    DTcols_options$order <- list(
+      list(1, "asc"), # comment
+      list(5, "desc"), # overall
+      list(4, "desc"), # DNA rating
+      list(2, "desc") # Age
+    )
+  } else {
+    # grouped columns
+    DTcols_options$cols <- htmltools::withTags(table(
+      class = "display",
+      thead(
+        tr(
+          # group columns and hover info
+          th(rowspan = 2, "Name", title = "Player Name"),
+          th(rowspan = 2, "Comment", title = "Comment"),
+          th(rowspan = 2, "Age", title = "Age"),
+          th(rowspan = 2, "Position", title = "Position"),
+          th(rowspan = 2, "DNA Rating", title = "DNA Rating"),
+          th(colspan = 4, "Aerial Challenges"),
+          th(colspan = 1, "Mistakes", aligne = "center"),
+          th(colspan = 3, "Movement", aligne = "center"),
+          th(colspan = 3, "Crosses", aligne = "center"),
+          th(colspan = 6, "Passes", aligne = "center"),
+          th(colspan = 4, "Shots", aligne = "center"),
+          th(colspan = 5, "Tackles & Interceptions", aligne = "center"),
+          th(colspan = 4, "Saves", aligne = "center"),
+          th(colspan = 20, "General", aligne = "center")
+        ),
+        tr(
+          # individual columns and hover info
+          th("Aer A/90", title = "Aerial Challenges attempts per 90 minutes"),
+          th("Hdrs W/90", title = "Headers won per 90 minutes"),
+          th("Hdr %", title = "Headers Won Ratio"),
+          th("K Hdrs/90", title = "Key Headers per 90 minutes"),
+          th("Gl Mst/90", title = "Mistakes Leading To Goal per 90 minutes"),
+          th("Dist/90", title = "Distance Covered Per 90 Minutes"),
+          th("DrbPG", title = "Dribbles Made Per Game"),
+          th("Off/90", title = "Offsides per 90 minutes"),
+          th("Cr A/90", title = "Cross Attempts per 90 minutes"),
+          th("Cr C/90", title = "Crosses Completed per 90 minutes"),
+          th("Cr C/A", title = "Cross Completion Ratio"),
+          th("Ps A/90", title = "Pass attempts per 90 minutes"),
+          th("Ps C/90", title = "Passes completed per 90 minutes"),
+          th("Pas %", title = "Pass Completion Ratio"),
+          th("K Ps/90", title = "Key Passes per 90 minutes"),
+          th("Ch C/90", title = "Chances Created per 90 minutes"),
+          th("Asts/90", title = "Assists per 90 minutes"),
+          th("Shot/90", title = "Shots per 90 minutes"),
+          th("ShT/90", title = "Shorts on target per 90 minutes"),
+          th("Shot %", title = "Shots On Target Ratio"),
+          th("Gls/90", title = "Goals per 90 minutes"),
+          th("Int/90", title = "Interceptions per 90 minutes"),
+          th("K Tck/90", title = "Key Tackles per 90 minutes"),
+          th("Tck A/90", title = "Tackle attempts per 90 minutes"),
+          th("Tck W/90", title = "Tackles Completed per 90 minutes"),
+          th("Tck R", title = "Tackle completion ratio"),
+          th("Svh/90", title = "Saves Held per 90 minutes"),
+          th("Svp/90", title = "Saves Parried per 90 minutes"),
+          th("Svt/90", title = "Saves Tipped per 90 minutes"),
+          th("Con/90", title = "Conceded per 90 minutes"),
+          th("Apps", title = "Appearances"),
+          th("Starts", title = "Starting Appearances"),
+          th("Mins", title = "Minutes"),
+          th("Av Rat", title = "Average rating"),
+          th("Clean sheets", title = "Clean sheets"),
+          th("Gwin", title = "Game win ratio"),
+          th("PoM", title = "Player Of The Match"),
+          th("Pts/Gm", title = "Points won per game"),
+          th("Tcon/90", title = "Team conceded per 90 minutes"),
+          th("Tgls/90", title = "Team goals per 90 minutes"),
+          th("Pens Faced", title = "Penalties Faced"),
+          th("Pens Saved", title = "Penalties Saved"),
+          th("Pens Saved Ratio", title = "Penalties Saved Ratio"),
+          th("Pens", title = "Penalties"),
+          th("Pens S", title = "Penalties scored"),
+          th("Pen/R", title = "Penalties scored ratio"),
+          th("FA/90", title = "Fouls Against per 90 minutes"),
+          th("Fls/90", title = "Fouls Made per 90 minutes"),
+          th("Yel/90", title = "Yellow cards per 90 minutes"),
+          th("Red/90", title = "Red cards per 90 minutes")
+        )
+      )
+    ))
+    # background color for grouped columns names
+    DTcols_options$group_JSrender <- "
+    function(thead) {
+    $(thead).closest('thead').find('th').eq(5).css('background-color', '#D9E1F2');
+    $(thead).closest('thead').find('th').eq(6).css('background-color', '#8EA9DB');
+    $(thead).closest('thead').find('th').eq(7).css('background-color', '#D9E1F2');
+    $(thead).closest('thead').find('th').eq(8).css('background-color', '#8EA9DB');
+    $(thead).closest('thead').find('th').eq(9).css('background-color', '#D9E1F2');
+    $(thead).closest('thead').find('th').eq(10).css('background-color', '#8EA9DB');
+    $(thead).closest('thead').find('th').eq(11).css('background-color', '#D9E1F2');
+    $(thead).closest('thead').find('th').eq(12).css('background-color', '#8EA9DB');
+    $(thead).closest('thead').find('th').eq(13).css('background-color', '#D9E1F2')
+    }
+    "
+    # sort order
+    DTcols_options$order <- list(
+      list(1, "asc"), # comment
+      list(4, "desc"), # DNA rating
+      list(2, "desc") # Age
+    )
+  }
+  
+  # number of freezed columns
+  nb_freezed_cols <- if_else(type == "attr", 6, 5)
+  
+  # DT table
+  DT::datatable(
+    data = difference,
+    # no row names displayed
+    rownames = FALSE,
+    # replace Rec column name: DNA rating
+    colnames = c("DNA Rating" = "Rec"),
+    # required extensions
+    extensions = "FixedColumns",
+    # options
+    options = list(
+      # freeze first 6 columns for attributes and 5 for stats
+      fixedColumns = list(leftColumns = nb_freezed_cols),
+      # no paging, scroll instead
+      paging = FALSE,
+      # grouped columns styling
+      headerCallback = JS(DTcols_options$group_JSrender),
+      # order
+      order = DTcols_options$order,
+      # horizontal scrolling enabled
+      scrollX = TRUE,
+      # vertical scrolling enabled
+      scrollY = "450px"
+    ),
+    # format grouped columns
+    container = DTcols_options$cols
+  ) %>%
+    # format font color and cell background depending on data
+    formatStyle(
+      5:dim(difference)[1],
+      backgroundColor = styleInterval(c(-.0001,0), c("#FFC7CE","#FFEB9C", "#C6EFCE")),
+      color = styleInterval(c(-.0001,0), c("#9C0006","#9C6500", "#006100"))
+    )
 }
 
-tabulate_it <- function(data, dataset) {
-  dataset <- if_else(dataset == "squad", "DNA Rating", "Scouting Rec")
-  reactable(
-    data,
-    defaultSortOrder = "desc",
-    columns = list(
-      Name = colDef(style = sticky_style(), headerStyle = sticky_style()),
-      Rec = colDef(style = function(value) {
-        color <- colorcatRec(value, FALSE)
-        list(background = color)
-      }, name = dataset),
-      Value = colDef(format = colFormat(
-        digits = 0, separators = TRUE, prefix = "\u20ac "
-      )),
-      Wage = colDef(format = colFormat(
-        digits = 0, separators = TRUE, prefix = "\u20ac "
-      ))
-    ),
-    defaultSorted = c("GamesPlayed", "Value", "Wage", "Rec", "Age"),
-    highlight = TRUE,
-    pagination = FALSE, height = 500
-  )
+# DT tables for the filtered data
+tabulate_filtdata <- function(data, dataset) {
+  # name of the Rec column in the table
+  Rec_name <- if_else(dataset == "squad", "DNA Rating", "Scouting Rec")
+  # replace name in data
+  names(data)[2] <- Rec_name
+  
+  # DT table
+  DT::datatable(
+    data = data,
+    # no row names displayed
+    rownames = FALSE,
+    # replace Rec column name by appropriate name: dataset
+    # add "p/w" to wage column name
+    colnames = c("Wage (p/w)" = "Wage"),
+    # options
+    options = list(
+      # no paging, scroll instead
+      paging = FALSE,
+      # order
+      order = list(
+        list(7, "desc"), # games played
+        list(5, "desc"), # value
+        list(6, "desc"), # wage
+        list(1, "desc"), # rec
+        list(4, "desc") # age
+      ),
+      # horizontal scrolling enabled
+      scrollX = TRUE,
+      # vertical scrolling enabled
+      scrollY = "500px"
+    )
+  ) %>%
+    # format font color and cell background depending on data
+    formatStyle(
+      # format all row based on Rec's value
+      2, target = "row",
+      # original colors
+      # c("#bf3eff", "#ff0000", "#ffa500", "#ffff00", "#00ee00", "#008b00")
+      backgroundColor = styleInterval(
+        c(-1, 49, 59, 69, 84),
+        c("#e5b1ff", "#ff9999", "#ffdb99", "#ffff99", "#92ff92", "#20ff20")
+      ),
+      color = styleInterval(
+        c(-1, 49, 59, 69, 84),
+        c("#6c00a2", "#990000", "#996300", "#666600", "#008100", "#004000")
+      )
+    ) %>%
+    # format Value and Wage as currency
+    formatCurrency(
+      columns = c("Value", "Wage (p/w)"),
+      currency = "\u20ac ",
+      interval = 3, mark = ",",
+      digits = 2, dec.mark = ".",
+      before = TRUE
+    )
 }
 
 # creates a subset of the data using and index
@@ -421,8 +789,25 @@ subsetdata <- function(data, reactindex, ...) {
 # import squad data and measure execution time
 cat("\nImporting squad data...")
 tic("\nImported squad data")
-squad <- parse_FMoutput("data/squad.html")
+# extract all squad files in the data folder
+squads <- list.files("data/") %>% .[grepl("^squad", list.files("data"))]
+# extract the in-game dates of each squad snapshot
+squads_dates <- squads %>% str_remove_all(".html|squad_")
+# extract the most recent in-game date from the squad snapshots
+squads_latest_date <- squads_dates %>% as.numeric() %>% max() %>% as.character()
+# empty list to contain all the squad snapshots
+squads <- list()
+# import all squad snapshots in a list
+for (i in squads_dates) {
+  # import squad snapshot
+  squads[[i]] <- parse_FMoutput(paste0("data/squad_", i, ".html"))
+  # # import squad snapshot
+  # squads$tempname <- parse_FMoutput(paste0("data/squad_", i, ".html"))
+  # # replace the name by the date
+  # names(squads) %<>% replace(. == "tempname", i)
+}
 toc()
+
 # import shortlist data and measure execution time
 cat("\nImporting shortlist data...")
 tic("\nImported shortlist data")
@@ -434,15 +819,20 @@ toc()
 # clean & format squad data and measure execution time
 cat("\nCleaning & formatting squad data...")
 tic("\nCleaned & formatted squad data")
-squad %<>% mutate(Rec = NA, .after = Name) %>% cleandata()
+# clean & format all squad snapshot data
+for (i in squads_dates) {
+  squads[[i]] %<>% mutate(Rec = NA, .after = Name) %>% cleandata()
+}
 toc()
+
 # clean & format shortlist data and measure execution time
 cat("\nCleaning & formatting shortlist data...")
 tic("\nCleaned & formatted shortlist data")
 shortlist %<>% cleandata()
 toc()
 
-# App inputs --------------------------------------------------------------
+# App inputs 2 ------------------------------------------------------------
+# dependant on the data
 
 # status message
 cat("\nLoading app data...")
@@ -451,27 +841,19 @@ tic("\nLoaded app data")
 # unique clubs appearing in the squad
 # i.e. the managed clubs + clubs with players on loan
 # managed club first on the list
-sqclubs <- squad$Club %>%
+sqclubs <- squads[[squads_latest_date]]$Club %>%
   # get frequencies of Club in the list
-  cbind(freq = ave(squad$Club, squad$Club, FUN = length)) %>%
+  cbind(freq = ave(squads[[squads_latest_date]]$Club, squads[[squads_latest_date]]$Club, FUN = length)) %>%
   unique() %>%
   as.data.frame() %>%
   # sort by desc order using the frequencies: managed club in first position
   dplyr::arrange(desc(freq)) %>%
   # pull list of clubs as vector
   dplyr::pull(1)
+
 # unique divisions appearing in the shortlist (put free player at the end)
 divisions <- shortlist$Division %>% unique() %>% sort() %>%
   .[. != "Free player/unknown"] %>% c("Free player/unknown")
-# unique FM positions
-positions <- c("GK", # goalkeepers
-               "D(L)", "D(C)", "D(R)", # defenders
-               "WB(L)", "WB(R)", # wingbacks
-               "DM", # defensive midfielders
-               "M(L)", "M(C)", "M(R)", # midfielders
-               "AM(L)", "AM(C)", "AM(R)", # attacking midfielders
-               "ST(C)" # strikers
-               )
 
 
 # App ui: header ----------------------------------------------------------
@@ -485,14 +867,18 @@ Header <- dashboardHeader(
 Sidebar <- dashboardSidebar(
   sidebarMenu(
     menuItem(
+      "Home", tabName = "home", icon = icon("home"),
+      selected = TRUE
+    ),
+    
+    menuItem(
       "Squad Analysis", tabName = "squad", icon = icon("users"),
-      startExpanded = TRUE,
+      startExpanded = FALSE,
       menuSubItem(
-        HTML("DNA Model"), tabName = "sqmodel", icon = icon("sliders-h")
+        "DNA Model", tabName = "sqmodel", icon = icon("sliders-h")
       ),
       menuSubItem(
-        "Filters", tabName = "sqfilter", icon = icon("filter"),
-        selected = TRUE
+        "Filters", tabName = "sqfilter", icon = icon("filter")
       ),
       menuSubItem(
         "General", tabName = "sqgen"
@@ -511,6 +897,9 @@ Sidebar <- dashboardSidebar(
       ),
       menuSubItem(
         "Tackling & Intercepting", tabName = "sqtackle"
+      ),
+      menuSubItem(
+        "Progress", tabName = "sqprog", icon = icon("chart-line")
       )
     ),
     
@@ -553,7 +942,60 @@ Sidebar <- dashboardSidebar(
 
 Body <- dashboardBody(
   tabItems(
-    #### Squad: DNA Model ####
+    #### Home ####
+    tabItem(
+      tabName = "home",
+      fluidRow(
+        # valuebox for the number of players at the club
+        valueBox(
+          value = squads[[squads_latest_date]] %>% nrow(),
+          subtitle = "players at the club",
+          icon = icon("users"), color = "aqua",
+          width = 4
+        ),
+        # valuebox for the number of players in the shortlist
+        valueBox(
+          value = shortlist %>% nrow(),
+          subtitle = "players in the shortlist",
+          icon = icon("search"), color = "aqua",
+          width = 4
+        )
+      ),
+      tabBox(
+        title = "Summary",
+        width = 12, height = "70vh",
+        tabPanel(
+          # goal contributions distribution bar plot
+          title = "Goal Contributions",
+          plotlyOutput(outputId = "home_plot_gcd")
+        ),
+        tabPanel(
+          # playing time boxplot
+          title = "Playing Time",
+          plotlyOutput(outputId = "home_plot_pt"),
+          HTML(
+            "
+            <p><br></p>
+            <p><em>* Use the boxplot diagrams to understand the data distribution. Actual points are available on the left of each diagram and information is available when hovered on.</em></p>
+            "
+          )
+        ),
+        tabPanel(
+          # wage boxplot
+          title = "Wage",
+          plotlyOutput(outputId = "home_plot_wage"),
+          HTML(
+            "
+            <p><br></p>
+            <p><em>* Use the boxplot diagrams to understand the data distribution. Actual points are available on the left of each diagram and information is available when hovered on.</em></p>
+            <p><em>** <strong>Loaned players</strong> and <strong>loaned out players</strong> are <u>not included</u>.</em></p>
+            "
+          )
+        )
+      )
+    ),
+    
+    #### Squad: DNA Model submenu ####
     tabItem(
       tabName = "sqmodel",
       box(
@@ -562,8 +1004,8 @@ Body <- dashboardBody(
         background = "purple",
         HTML(
           "
-            <p>Constitute your DNA model by selecting key attributes for your playing style. The selected attributes will be used to calculate your players DNA rating according to the model.</p>
-            "
+          <p>Constitute your DNA model by selecting key attributes for your playing style. The selected attributes will be used to calculate your players DNA rating according to the model.</p>
+          "
         ),
         splitLayout(
           cellWidths = c("25%", "25%", "25%", "25%"),
@@ -715,26 +1157,6 @@ Body <- dashboardBody(
             inputId = "squad_age", label = "Age:",
             min = 16, max = 45, value = c(16,45), step = 1
           ),
-          # # maximal value and wage filters
-          # splitLayout(
-          #   cellWidths = c('50%','50%'),
-          #   autonumericInput(
-          #     inputId = "scout_maxvalue", label = "Max value:",
-          #     value = 50000000, maximumValue = 500000000, minimumValue = 0,
-          #     align = "right",
-          #     currencySymbol = "\u20ac ", currencySymbolPlacement = "p",
-          #     decimalCharacter = ".", digitGroupSeparator = ",",
-          #     decimalPlaces = 0
-          #   ),
-          #   autonumericInput(
-          #     inputId = "scout_maxwage", label = "Max wage (p/w):",
-          #     value = 500000, maximumValue = 5000000, minimumValue = 0,
-          #     align = "right",
-          #     currencySymbol = "\u20ac ", currencySymbolPlacement = "p",
-          #     decimalCharacter = ".", digitGroupSeparator = ",",
-          #     decimalPlaces = 0
-          #   )
-          # ),
           # minimal total appearances filter
           sliderInput(
             inputId = "squad_minapps", label = "Min total appearances:",
@@ -746,9 +1168,8 @@ Body <- dashboardBody(
           title = "Filtered subset overview",
           width = 9, height = '85vh',
           status = "primary", solidHeader = FALSE,
-          reactableOutput(
-            outputId = "squad_filtered",
-            height = '100%', width = '100%'
+          DT::DTOutput(
+            outputId = "squad_filtered"
           )
         )
       )
@@ -1105,6 +1526,56 @@ Body <- dashboardBody(
       )
     ),
     
+    #### Squad: Progress submenu ####
+    tabItem(
+      tabName = "sqprog",
+      # progress analysis tabbox
+      tabBox(
+        width = 12, height = "85vh",
+        tabPanel(
+          title = "Dates selection",
+          HTML(
+            "
+            <p>Select a <em>&quot;start date&quot;</em> and an <em>&quot;end date&quot;</em> to compare your squad&apos;s data between the selected dates. The available dates to select from are inferred from the name of your squad data files extracted from Football Manager and stored in your <strong>data</strong> folder. To avoid errors, name all your squad data as follows: <strong><em>&quot;</em></strong><strong><em>squad_yyyymmdd&quot;</em></strong>, where <em>&quot;yyyymmdd&quot;</em> represents the in-game date.</p>
+            <p><br></p>
+            "
+          ),
+          # start date
+          pickerInput(
+            inputId = "squad_startdate", label = "Start date: ",
+            choices = squads_dates %>% as.Date(format = "%Y%m%d") %>% sort() %>% format("%d %b %Y"),
+            selected = squads_dates %>% min() %>% as.Date(format = "%Y%m%d") %>% format("%d %b %Y"),
+            multiple = FALSE,
+            options = list(
+              `size` = 5
+            )
+          ),
+          # end date
+          pickerInput(
+            inputId = "squad_enddate", label = "End date: ",
+            choices = squads_dates %>% as.Date(format = "%Y%m%d") %>% sort() %>% format("%d %b %Y"),
+            selected = squads_latest_date %>% as.Date(format = "%Y%m%d") %>% format("%d %b %Y"),
+            multiple = FALSE,
+            options = list(
+              `size` = 5
+            )
+          )
+        ),
+        tabPanel(
+          title = "Performance",
+          DT::DTOutput(
+            outputId = "squad_progperf"
+          )
+        ),
+        tabPanel(
+          title = "Attributes",
+          DT::DTOutput(
+            outputId = "squad_progattr"
+          )
+        )
+      )
+    ),
+    
     #### Scouting: Filters submenu ####
     tabItem(
       tabName = "scfilter",
@@ -1174,9 +1645,8 @@ Body <- dashboardBody(
           title = "Filtered subset overview",
           width = 9, height = '85vh',
           status = "primary", solidHeader = FALSE,
-          reactableOutput(
-            outputId = "scout_filtered",
-            height = '100%', width = '100%'
+          DT::DTOutput(
+            outputId = "scout_filtered"
           )
         )
       )
@@ -1654,9 +2124,8 @@ Body <- dashboardBody(
         title = "Shortlist output",
         width = 12, height = '85vh',
         status = "primary",
-        reactableOutput(
-          outputId = "scout_listfinal",
-          height = '100%', width = '100%'
+        DT::DTOutput(
+          outputId = "scout_listfinal"
         )
       )
     ),
@@ -1676,8 +2145,6 @@ Body <- dashboardBody(
             <p><br></p>
             <p><strong>Developed by:</strong>
             <br>gam945 (<em>SI forums</em>)/ybenadjal (<em>GitHub</em>)</p>
-            <p><strong>Contributors:</strong>
-            <br>biglew90(<em>SI Forums</em>)/LBrookes90 (<em>GitHub</em>)</p>
             <p><br></p>
             <p>PM me on the SI forums to contribute ;)</p>
             "
@@ -1711,6 +2178,224 @@ ui <- dashboardPage(Header, Sidebar, Body, skin = "purple")
 
 server <- function(input, output, session) {
   
+  #### Home ####
+  
+  # goal contributions distribution plot
+  output$home_plot_gcd <- renderPlotly({
+    plot_ly(
+      # goal contribution distribution data
+      # use latest snapshot of the squad
+      data = squads[[squads_latest_date]] %>%
+        # required data points: name, club, goals, assists
+        select(Name, Club, Gls, Ast, Position, Wage, Age, Mins) %>%
+        # remove NA values
+        drop_na() %>%
+        # keep only players that are currently at the club, i.e remove loaned players
+        dplyr::filter(Club == sort(table(Club), decreasing = TRUE) %>% names() %>% .[1]) %>%
+        # remove players that have no goals 
+        dplyr::filter(Gls + Ast != 0),
+      # order goals and assists by decreasing order: left to right
+      # add goals data
+      x = ~reorder(reorder(Name, -Ast), -Gls), y = ~Gls, name = "Goals",
+      type = "bar",
+      # adds text when marker is hovered on
+      hoverinfo = "text",
+      # define text logic: name, age, position, mins, ratio and marker value
+      hovertext = ~paste0(
+        "<b>Name: ", Name,
+        "<br>Age: </b>", Age,
+        "<br><b>Position: </b>", Position,
+        "<br><b>Wage: </b> \u20AC ", formatC(Wage, format="f", big.mark = ",", digits=0), " p/w",
+        "<br><b>Games played: </b>", round(Mins/90, digits = 1)
+      ),
+      # text on the bar
+      text = ~Gls, textposition = "auto",
+      marker = list(color = "purple")
+    ) %>%
+      add_trace(
+        # add assists data
+        y = ~Ast, name = "Assists",
+        # adds text when marker is hovered on
+        hoverinfo = "text",
+        # define text logic
+        hovertext = ~paste0(
+          "<b>Name: ", Name,
+          "<br>Age: </b>", Age,
+          "<br><b>Position: </b>", Position,
+          "<br><b>Wage: </b> \u20AC ", formatC(Wage, format="f", big.mark = ",", digits=0), " p/w",
+          "<br><b>Games played: </b>", round(Mins/90, digits = 1)
+        ),
+        # text on the bar
+        text = ~Ast, textposition = "auto",
+        marker = list(color = "cyan")
+      ) %>%
+      # no axis labels, add title
+      layout(
+        # title: X goals and Y assists in Z competitive matches
+        title = ~paste0(
+          sum(replace_na(Gls, 0)),
+          " goals and ",
+          sum(replace_na(Ast, 0)),
+          " assists in ",
+          # total number of minutes divided by 11 players divided by 90 minutes
+          # gives total of competitive matches played
+          sum(replace_na(Mins, 0)) %>% prod(1/11) %>% prod(1/90),
+          " competitive matches"
+        ),
+        xaxis = list(title = ""), yaxis = list(title = ""),
+        # data used for the dynamic plot title
+        data = squads[[squads_latest_date]] %>%
+          select(Club, Gls, Ast, Mins) %>%
+          dplyr::filter(Club == sort(table(Club), decreasing = TRUE) %>% names() %>% .[1])
+      )
+  })
+  
+  # playing time distribution plot
+  output$home_plot_pt <- renderPlotly({
+    # dataframe for player status (agreed playing time) and status' category
+    apt_category <- data.frame(apt = c(
+      "Star Player", "Important Player", "Regular Starter",
+      "Squad Player", "Impact Sub", "Fringe Player",
+      "Emergency Backup", "B Team Regular", "Surplus to Requirements",
+      "Breakthrough Prospect", "Future Prospect", "Youngster",
+      "First-Choice Goalkeeper", "Cup Goalkeeper", "Backup",
+      "Loaned out, Age\u226523", "Loaned out, 19\u2264Age\u226422", "Loaned out, Age\u226418"
+    ), cat = c(rep("Senior Squad", 9), rep("Youth Players", 3), rep("Goalkeepers", 3), rep("Loaned Players", 3))) %>%
+      # add number of occurrences for each player status
+      mutate(
+        apt = paste0(
+          apt, " (", table(squads[[squads_latest_date]]$`Agreed Playing Time`)[apt], ")"
+        ) %>%
+          # replace NA by 0 in the occurrences
+          str_replace_all("NA", "0")
+      )
+    
+    plot_ly(
+      # playing time data
+      data = squads[[squads_latest_date]] %>%
+        # required data points: playing time, age, minutes
+        select(Name, Age, Position, Wage, `Agreed Playing Time`, Mins, Gls, Ast) %>%
+        # games played = minutes/90
+        mutate(`Games Played` = round(`Mins`/90, digits = 1) %>% replace_na(0), .keep = "unused") %>%
+        # subset loaned out categories by age
+        mutate(`Agreed Playing Time` = if_else(
+          condition = is.na(`Agreed Playing Time`),
+          true = case_when(
+            `Age` <= 18 ~ "Loaned out, Age\u226418",
+            between(`Age`,19,22) ~ "Loaned out, 19\u2264Age\u226422",
+            `Age`>= 23 ~ "Loaned out, Age\u226523"
+          ),
+          false = `Agreed Playing Time`
+        )) %>%
+        # number of occurrences of each status
+        mutate(freq = table(`Agreed Playing Time`)[`Agreed Playing Time`]) %>%
+        # add frequency to status
+        mutate(`Agreed Playing Time` = paste0(`Agreed Playing Time`, " (", freq, ")")) %>%
+        # left join to add the categories
+        left_join(y = apt_category, by = c("Agreed Playing Time" = "apt")) %>%
+        # add loaned out category
+        mutate(cat = replace_na(cat, "Loaned Players")),
+      x = ~`Agreed Playing Time`, y = ~`Games Played`,
+      type = "box", boxpoints = "all",
+      color = ~cat,
+      colors = c(
+        "Senior Squad" = "purple", # squad
+        "Youth Players" = "deepskyblue2", # youth
+        "Goalkeepers" = "green3", # gk
+        "Loaned Players" = "orange" # loaned
+      ),
+      # adds text when marker is hovered on
+      hoverinfo = "text",
+      # define text logic
+      hovertext = ~paste0(
+        "<b>Name: ", Name,
+        "<br>Age: </b>", Age,
+        "<br><b>Position: </b>", Position,
+        "<br><b>Wage: </b> \u20AC ", formatC(Wage, format="f", big.mark = ",", digits=0), " p/w",
+        "<br><b>Games played: </b>", replace_na(`Games Played`, 0),
+        "<br><b>Goals: </b>", replace_na(Gls, 0),
+        "<br><b>Assists: </b>", replace_na(Ast, 0)
+      )
+    ) %>%
+      layout(
+        xaxis = list(
+          # no title axis
+          title = "",
+          # order x axis
+          categoryorder = "array", categoryarray = apt_category$apt
+        ),
+        # y axis title
+        yaxis = list(title = "Games Played")
+      )
+  })
+  
+  # playing time distribution plot
+  output$home_plot_wage <- renderPlotly({
+    # dataframe for player status (agreed playing time) and status' category
+    apt_category <- data.frame(apt = c(
+      "Star Player", "Important Player", "Regular Starter",
+      "Squad Player", "Impact Sub", "Fringe Player",
+      "Emergency Backup", "B Team Regular", "Surplus to Requirements",
+      "Breakthrough Prospect", "Future Prospect", "Youngster",
+      "First-Choice Goalkeeper", "Cup Goalkeeper", "Backup"
+    ), cat = c(rep("Senior Squad", 9), rep("Youth Players", 3), rep("Goalkeepers", 3))) %>%
+      # add number of occurrences for each player status
+      mutate(
+        apt = paste0(
+          apt, " (", table((squads[[squads_latest_date]] %>% dplyr::filter(is.na(`Loan Expires`)))$`Agreed Playing Time`)[apt], ")"
+        ) %>%
+          # replace NA by 0 in the occurrences
+          str_replace_all("NA", "0")
+      )
+    
+    plot_ly(
+      # wage data
+      data = squads[[squads_latest_date]] %>%
+        # required data points
+        select(Name, Age, Position, `Agreed Playing Time`, Wage, `Loan Expires`, Mins, Gls, Ast) %>%
+        # remove loaned in and loaned out players
+        dplyr::filter(is.na(`Loan Expires`)) %>%
+        # remove loan expiration column
+        select(-`Loan Expires`) %>%
+        # number of occurrences of each status
+        mutate(freq = table(`Agreed Playing Time`)[`Agreed Playing Time`]) %>%
+        # add frequency to status
+        mutate(`Agreed Playing Time` = paste0(`Agreed Playing Time`, " (", freq, ")")) %>%
+        # left join to add the categories
+        left_join(y = apt_category, by = c("Agreed Playing Time" = "apt")),
+      x = ~`Agreed Playing Time`, y = ~Wage,
+      type = "box", boxpoints = "all",
+      color = ~cat,
+      colors = c(
+        "Senior Squad" = "purple", # squad
+        "Youth Players" = "deepskyblue2", # youth
+        "Goalkeepers" = "green3" # gk
+      ),
+      # adds text when marker is hovered on
+      hoverinfo = "text",
+      # define text logic
+      hovertext = ~paste0(
+        "<b>Name: ", Name,
+        "<br>Age: </b>", Age,
+        "<br><b>Position: </b>", Position,
+        "<br><b>Wage: </b> \u20AC ", formatC(Wage, format="f", big.mark = ",", digits=0), " p/w",
+        "<br><b>Games played: </b>", round(replace_na(Mins, 0)/90, digits = 1),
+        "<br><b>Goals: </b>", replace_na(Gls, 0),
+        "<br><b>Assists: </b>", replace_na(Ast, 0)
+      )
+    ) %>%
+      layout(
+        xaxis = list(
+          # no title axis
+          title = "",
+          # order x axis
+          categoryorder = "array", categoryarray = apt_category$apt
+        ),
+        # y axis title
+        yaxis = list(title = "Wage (p/w)")
+      )
+  })
+  
   #### Squad: DNA Model ####
   
   # deselect all attributes from a category when the "Deselect all <category>" button is clicked on
@@ -1743,46 +2428,51 @@ server <- function(input, output, session) {
     }
   )
   
-  # calculate ratings
-  squad_DNArated <- reactive({
-    if (length(c(input$sqmodel_technical, input$sqmodel_mental, input$sqmodel_physical, input$sqmodel_gk)) == 0) {
-      squad %>% mutate(`Rec` = -1)
-    } else {
-      # key outfield attributes
-      outf_keyattr <- c(input$sqmodel_technical, input$sqmodel_mental, input$sqmodel_physical)
-      outf_n <- length(outf_keyattr)
-      # key gk attributes
-      gk_keyattr <- c(input$sqmodel_mental, input$sqmodel_physical, input$sqmodel_gk)
-      gk_n <- length(gk_keyattr)
-      # subset data: outfield players
-      outf_players <- squad %>%
-        dplyr::select(Name, Position, all_of(outf_keyattr)) %>%
-        dplyr::filter(Position != "GK")
-      # subset data: goalkeepers
-      gk_players <- squad %>%
-        dplyr::select(Name, Position, all_of(gk_keyattr)) %>%
-        dplyr::filter(Position == "GK")
-      # get ratings for outfield players
-      outf_players %<>% cbind(Rec = dplyr::select(outf_players, -c(Name, Position)) %>% rowSums()) %>%
-        dplyr::select(Name, Position,Rec) %>%
-        mutate(Rec = round(Rec*100/20/outf_n, digits = 0))
-      # get ratings for outfield players
-      gk_players %<>% cbind(Rec = dplyr::select(gk_players, -c(Name, Position)) %>% rowSums()) %>%
-        dplyr::select(Name, Position,Rec) %>%
-        mutate(Rec = round(Rec*100/20/gk_n, digits = 0))
-      # ratings
-      ratings <- rbind(outf_players, gk_players)
-      # inner join by name and position
-      squad %>% dplyr::select(-Rec) %>%
-        inner_join(y = ratings, by = c("Name" = "Name", "Position" = "Position"))
-    }
-  })
+  # calculate the DNA ratings
+  # initial empty reactive list
+  squads_DNArated <- reactiveValues()
+  # calculate each date's DNA ratings
+  for (i in squads_dates) {
+    squads_DNArated[[i]] <- reactive({
+      if (length(c(input$sqmodel_technical, input$sqmodel_mental, input$sqmodel_physical, input$sqmodel_gk)) == 0) {
+        squads[[i]] %>% mutate(`Rec` = -1)
+      } else {
+        # key outfield attributes
+        outf_keyattr <- c(input$sqmodel_technical, input$sqmodel_mental, input$sqmodel_physical)
+        outf_n <- length(outf_keyattr)
+        # key gk attributes
+        gk_keyattr <- c(input$sqmodel_mental, input$sqmodel_physical, input$sqmodel_gk)
+        gk_n <- length(gk_keyattr)
+        # subset data: outfield players
+        outf_players <- squads[[i]] %>%
+          dplyr::select(Name, Position, all_of(outf_keyattr)) %>%
+          dplyr::filter(Position != "GK")
+        # subset data: goalkeepers
+        gk_players <- squads[[i]] %>%
+          dplyr::select(Name, Position, all_of(gk_keyattr)) %>%
+          dplyr::filter(Position == "GK")
+        # get ratings for outfield players
+        outf_players %<>% cbind(Rec = dplyr::select(outf_players, -c(Name, Position)) %>% rowSums()) %>%
+          dplyr::select(Name, Position,Rec) %>%
+          mutate(Rec = round(Rec*100/20/outf_n, digits = 0))
+        # get ratings for outfield players
+        gk_players %<>% cbind(Rec = dplyr::select(gk_players, -c(Name, Position)) %>% rowSums()) %>%
+          dplyr::select(Name, Position,Rec) %>%
+          mutate(Rec = round(Rec*100/20/gk_n, digits = 0))
+        # ratings
+        ratings <- rbind(outf_players, gk_players)
+        # inner join by name and position
+        squads[[i]] %>% dplyr::select(-Rec) %>%
+          inner_join(y = ratings, by = c("Name" = "Name", "Position" = "Position"))
+      }
+    })
+  }
   
   #### Squad: Filters ####
   
-  # filtered subset data for reactable presentation
+  # filtered subset data for DT table presentation
   squad_filtsubset <- reactive({
-    squad_DNArated() %>% as.data.frame() %>%
+    squads_DNArated[[squads_latest_date]]() %>% as.data.frame() %>%
       select(Name, Rec, Position, PositionParsed, Division, Club, Age, Value, Wage, Mins) %>%
       # filter using the filters inputs
       dplyr::filter(Club %in% input$squad_club) %>%
@@ -1795,14 +2485,14 @@ server <- function(input, output, session) {
       dplyr::filter(Mins >= input$squad_minapps*90) %>%
       dplyr::select(-c(Division, PositionParsed)) %>%
       mutate(
-        GamesPlayed = round(Mins/90, digits = 1), .keep = "unused", .after = Mins
+        `Games Played` = round(Mins/90, digits = 1), .keep = "unused", .after = Mins
       ) %>%
       drop_na()
   })
   
-  # filtered subset reactable
-  output$squad_filtered <- renderReactable({
-    tabulate_it(data = squad_filtsubset(), dataset = "squad")
+  # filtered subset DT table
+  output$squad_filtered <- DT::renderDT({
+    tabulate_filtdata(data = squad_filtsubset(), dataset = "squad")
   })
   
   # filtered subset names: used as an index
@@ -1810,10 +2500,10 @@ server <- function(input, output, session) {
     squad_filtsubset() %>% as.data.frame() %>% dplyr::select(Name)# %>% as.vector()
   })
   
-  # filtered subset reactable for plots
+  # filtered subset DT table for plots
   squad_data <- reactive({
     subsetdata(
-      data = squad_DNArated() %>% as.data.frame(),
+      data = squads_DNArated[[squads_latest_date]]() %>% as.data.frame(),
       reactindex = as.vector(as.data.frame(squad_index())$Name),
       `Av Rat`, `Pts/Gm`, `Clean sheets`, # general
       `Ps A/90`, `Ps C/90`, `K Ps/90`, `Ch C/90`, `Asts/90`, `Cr A`, `Cr C`, # passing
@@ -2228,9 +2918,20 @@ server <- function(input, output, session) {
     )
   })
   
+  #### Squad: Progress ####
+  
+  # stats progress
+  output$squad_progperf <- DT::renderDT({
+    tabulate_progress(squads_DNArated, input$squad_startdate, input$squad_enddate, "stats")
+  })
+  # attributes progress
+  output$squad_progattr <- DT::renderDT({
+    tabulate_progress(squads_DNArated, input$squad_startdate, input$squad_enddate, "attr")
+  })
+  
   #### Scouting: Filters ####
   
-  # filtered subset data for reactable presentation
+  # filtered subset data for DT table presentation
   scout_filtsubset <- reactive({
     shortlist %>%
       select(Name, Rec, Position, PositionParsed, Division, Club, Age, Value, Wage, Mins) %>%
@@ -2245,14 +2946,14 @@ server <- function(input, output, session) {
       dplyr::filter(Mins >= input$scout_minapps*90) %>%
       dplyr::select(-c(Division, PositionParsed)) %>%
       mutate(
-        GamesPlayed = round(Mins/90, digits = 1), .keep = "unused", .after = Mins
+        `Games Played` = round(Mins/90, digits = 1), .keep = "unused", .after = Mins
       ) %>%
       drop_na()
   })
   
-  # filtered subset reactable
-  output$scout_filtered <- renderReactable({
-    tabulate_it(data = scout_filtsubset(), dataset = "scouting")
+  # filtered subset DT table
+  output$scout_filtered <- DT::renderDT({
+    tabulate_filtdata(data = scout_filtsubset(), dataset = "scouting")
   })
   
   # filtered subset names: used as an index
@@ -2260,7 +2961,7 @@ server <- function(input, output, session) {
     scout_filtsubset() %>% as.data.frame() %>% dplyr::select(Name)# %>% as.vector()
   })
   
-  # filtered subset reactable for plots
+  # filtered subset DT table for plots
   scout_data <- reactive({
     subsetdata(
       data = shortlist, reactindex = as.vector(as.data.frame(scout_index())$Name),
@@ -2680,7 +3381,7 @@ server <- function(input, output, session) {
   #### Scouting: Shortlist ####
   
   # render final table
-  output$scout_listfinal <- renderReactable({
+  output$scout_listfinal <- DT::renderDataTable({
     # intersection of all players chosen in the different scouting submenus
     listfinal <- Reduce(intersect, list(
       input$scgen_shortl,
@@ -2692,13 +3393,83 @@ server <- function(input, output, session) {
     ))
     # filter filtered subset scouting data with only the final names
     listfinal_data <-  shortlist %>%
-      select(Name, Rec, Position, Club, Age, Value, Wage, Mins) %>%
-      mutate(
-        GamesPlayed = round(Mins/90, digits = 1), .keep = "unused", .after = Mins
+      select(
+        Name, Rec, Position, Age,
+        `Min AP`, `Max AP`, `Min WD`, `Max WD`,
+        `Min Fee Rls`,
+        `Injury Rls`, `Min Fee Rls Clubs In Cont Comp`, `Min Fee Rls Clubs Mjr Cont Comp`,
+        `Min Fee Rls to Higher Div`, `Min Fee Rls to Domestic Clubs`, `Min Fee Rls to Foreign Clubs`,
+        `Non Prom Rls Cls`, `Non-Playing Rel`, `Relegation Release`
+      ) %>%
+      mutate(Rls = if_else(is.na(`Min Fee Rls`), "No", "Yes"), .keep = "unused") %>%
+      mutate(CondRls = if_else(
+        is.na(`Injury Rls`) &&
+          is.na(`Min Fee Rls Clubs In Cont Comp`) &&
+          is.na(`Min Fee Rls Clubs Mjr Cont Comp`) &&
+          is.na(`Min Fee Rls to Higher Div`) &&
+          is.na(`Min Fee Rls to Domestic Clubs`) &&
+          is.na(`Min Fee Rls to Foreign Clubs`) &&
+          is.na(`Non Prom Rls Cls`) && 
+          is.na(`Non-Playing Rel`) &&
+          is.na(`Relegation Release`),
+        "No", "Yes"), .keep = "unused"
       ) %>%
       dplyr::filter(Name %in% listfinal)
-    # reactable
-    tabulate_it(data = listfinal_data, dataset = "scouting")
+    
+    # DT table
+    DT::datatable(
+      data = listfinal_data,
+      # no row names displayed
+      rownames = FALSE,
+      # replace Rec column name by appropriate name: dataset
+      # add "p/w" to wage column name
+      colnames = c(
+        "Scouting Rec" = "Rec",
+        "Min WD (p/w)" = "Min WD", "Max WD (p/w)" = "Max WD",
+        "Rls Cls?" = "Rls", "Conditional Rls Cls?" = "CondRls"
+      ),
+      # options
+      options = list(
+        # no paging, scroll instead
+        paging = FALSE,
+        # order
+        order = list(
+          list(1, "desc"), # rec
+          list(5, "desc"), # max value
+          list(4, "desc"), # min value
+          list(7, "desc"), # max wage
+          list(6, "desc"), # min wage
+          list(3, "desc") # age
+        ),
+        # horizontal scrolling enabled
+        scrollX = TRUE,
+        # vertical scrolling enabled
+        scrollY = "500px"
+      )
+    ) %>%
+    # format font color and cell background depending on data
+    formatStyle(
+      # format all row based on Rec's value
+      2, target = "row",
+      # original colors
+      # c("#bf3eff", "#ff0000", "#ffa500", "#ffff00", "#00ee00", "#008b00")
+      backgroundColor = styleInterval(
+        c(-1, 49, 59, 69, 84),
+        c("#e5b1ff", "#ff9999", "#ffdb99", "#ffff99", "#92ff92", "#20ff20")
+      ),
+      color = styleInterval(
+        c(-1, 49, 59, 69, 84),
+        c("#6c00a2", "#990000", "#996300", "#666600", "#008100", "#004000")
+      )
+    ) %>%
+    # format Value and Wage as currency
+    formatCurrency(
+      columns = 5:8,
+      currency = "\u20ac ",
+      interval = 3, mark = ",",
+      digits = 2, dec.mark = ".",
+      before = TRUE
+    )
   })
   
 }
